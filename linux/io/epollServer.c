@@ -22,21 +22,19 @@ int main(int argc, char* argv[])
     socklen_t clilen;
 
     //ev用于注册事件,数组用于回传要处理的事件
-
-    struct epoll_event ev,events[20];
+    struct epoll_event ev, events[20];
+    
     //生成用于处理accept的epoll专用的文件描述符
-
     epfd=epoll_create(256);
     struct sockaddr_in cliaddr, servaddr;
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
 
     //setnonblocking(listenfd);
     //设置与要处理的事件相关的文件描述符
-
     ev.data.fd=listenfd;
     ev.events=EPOLLIN|EPOLLET;
+    
     //注册epoll事件
-
     epoll_ctl(epfd,EPOLL_CTL_ADD,listenfd,&ev);
 
     bzero(&servaddr, sizeof(servaddr));
@@ -45,7 +43,7 @@ int main(int argc, char* argv[])
     servaddr.sin_port = htons (SERV_PORT);
     bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
     listen(listenfd, LISTENQ);
-    maxi = 0; //useless
+
     for ( ; ; ) {
         nfds=epoll_wait(epfd,events,20,0);
 
@@ -60,7 +58,7 @@ int main(int argc, char* argv[])
                 }
 //                setnonblocking(connfd);
 
-                char *str = inet_ntoa(cliaddr.sin_addr);
+                //char *str = inet_ntoa(cliaddr.sin_addr);
                 printf("connected client:%s\n", connfd);
 
                 ev.data.fd=connfd;
@@ -69,7 +67,6 @@ int main(int argc, char* argv[])
             }
             else if (events[i].events&EPOLLIN)
                 //如果是已经连接的用户，并且收到数据，那么进行读入。
-
             {
                 if ( (sockfd = events[i].data.fd) < 0)
                     continue;
@@ -82,21 +79,22 @@ int main(int argc, char* argv[])
                 } else if (n == 0) {
                     close(sockfd);
                     events[i].data.fd = -1;
+                } else {
+                    BUF[n] = '\0';
+                    printf("recv msg from client connectfd: %d, content:%s\n",sockfd, BUF);
+
+                    ev.data.fd=sockfd;
+                    ev.events=EPOLLOUT|EPOLLET;
+                    //读完后准备写
+                    epoll_ctl(epfd,EPOLL_CTL_MOD,sockfd,&ev);
                 }
-                BUF[n] = '\0';
-                printf("recv msg from client connectfd: %d, content:%s\n",sockfd, BUF);
-
-                ev.data.fd=sockfd;
-                ev.events=EPOLLOUT|EPOLLET;
-                //读完后准备写
-                epoll_ctl(epfd,EPOLL_CTL_MOD,sockfd,&ev);
-
             }
             else if(events[i].events&EPOLLOUT) // 如果有数据发送
-
             {
                 sockfd = events[i].data.fd;
-                write(sockfd, BUF, n);
+                
+                sprintf(BUF, "%s", "hello world!");
+                write(sockfd, BUF, strlen(BUF));
 
                 ev.data.fd=sockfd;
                 ev.events=EPOLLIN|EPOLLET;
